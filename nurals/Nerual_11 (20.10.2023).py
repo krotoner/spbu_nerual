@@ -22,48 +22,47 @@ relu = lambda x: (x >= 0) * x
 relu2deriv = lambda x: x >= 0
 
 alpha = 0.001
-iters = 350
+iters = 300
 hidden_size = 100
 pixels_per_image = 784
 num_labels = 10
+#Зададим размер для пакетного градиентного спуска
+batch_size = 100
 
-# размер градиентного спуска
-bath_size = 100
+weights_0_1 = 0.2 * np.random.random((pixels_per_image, hidden_size)) - 0.1
+weights_1_2 = 0.2 * np.random.random((hidden_size, num_labels)) - 0.1
 
 prev_cnt = 0
 j = 0
 end_ahad = False
-
-weights_0_1 = 0.2 * np.random.random((pixels_per_image, hidden_size)) - 0.1
-weights_1_2 = 0.2 * np.random.random((hidden_size, num_labels)) - 0.1
 while ((j < iters) and end_ahad is False):
     error = 0.0
     correct_cnt = 0
-    for i in range(int(len(images)/bath_size)):
-
-        bath_start = i * bath_size
-        bath_end = i + 1 * bath_size
-
+    for i in range(int(len(images)/batch_size)):
+        batch_start = i * batch_size
+        batch_end = (i + 1) * batch_size
         # Берем картинку из images для обучения
-        layer_0 = images[i:i + 1]
+        layer_0 = images[batch_start:batch_end]
         layer_1 = relu(np.dot(layer_0, weights_0_1))
+
+        #Применяем маску прореживания
         dropout_mask = np.random.randint(2, size=layer_1.shape)
         layer_1 *= dropout_mask * 2
+
         layer_2 = np.dot(layer_1, weights_1_2)
 
         # Вычисление ошибки
         error += np.sum((labels[i:i + 1] - layer_2) ** 2)
 
-        # Обучение
-        for k in range(bath_size):
-            pt1 = np.argmax(layer_2[k:k + 1])
-            pt2 = np.argmax(labels[bath_start + k: bath_start + k + 1])
+        # Обучение, используя пакетный градиентный спуск
+        for k in range(batch_size):
+            pt1 = np.argmax(layer_2[k:k+1])
+            pt2 = np.argmax(labels[batch_start+k:batch_start+k+1])
             correct_cnt += int(pt1 == pt2)
 
-            layer_2_delta = (labels[bath_start:bath_end] - layer_2) / bath_size
+            layer_2_delta = (labels[batch_start:batch_end] - layer_2) / batch_size
             layer_1_delta = np.dot(layer_2_delta, weights_1_2.T) * relu2deriv(layer_1)
-            layer_1_delta *= dropout_mask
-
+            layer_1_delta *= dropout_mask # <-  в обратном ходе
             weights_1_2 += alpha * np.dot(layer_1.T, layer_2_delta)
             weights_0_1 += alpha * np.dot(layer_0.T, layer_1_delta)
         sys.stdout.write("\r I:" + str(j) + " Train-Err:" + str(error / float(len(images)))[0:5] + " Train-Acc:" + str(
@@ -88,8 +87,7 @@ while ((j < iters) and end_ahad is False):
 
         # if prev_cnt > correct_cnt:
         #     end_ahad = True
+
         # prev_cnt = correct_cnt
 
     j += 1
-
-    # os.system('shutdown -s')
